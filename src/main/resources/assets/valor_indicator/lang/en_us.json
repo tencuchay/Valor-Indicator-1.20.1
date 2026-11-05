@@ -1,0 +1,17 @@
+{
+  "key.categories.valor_indicator": "Valor Indicator",
+  "key.valor_indicator.open_stats": "Open Stats",
+  "screen.valor_indicator.stats.title": "Stats",
+  "stat.valor_indicator.max_health": "Max Health",
+  "stat.valor_indicator.attack": "Attack",
+  "stat.valor_indicator.magic_power": "Magic Power",
+  "stat.valor_indicator.armor": "Armor",
+  "stat.valor_indicator.magic_armor": "Magic Armor",
+  "stat.valor_indicator.crit_rate": "Crit Rate",
+  "stat.valor_indicator.crit_damage": "Crit Damage",
+  "stat.valor_indicator.attack_speed": "Attack Speed",
+  "stat.valor_indicator.health_regen": "Health Regen / 5s",
+  "stat.valor_indicator.max_mana": "Max Mana",
+  "stat.valor_indicator.mana_regen": "Mana Regen / 5s",
+  "stat.valor_indicator.move_speed": "Movement Speed"
+}

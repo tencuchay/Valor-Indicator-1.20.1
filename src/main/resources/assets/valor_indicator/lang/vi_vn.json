@@ -1,0 +1,17 @@
+{
+  "key.categories.valor_indicator": "Valor Indicator",
+  "key.valor_indicator.open_stats": "Mở bảng thông số",
+  "screen.valor_indicator.stats.title": "Thông số",
+  "stat.valor_indicator.max_health": "Máu tối đa",
+  "stat.valor_indicator.attack": "Công vật lý",
+  "stat.valor_indicator.magic_power": "Công phép",
+  "stat.valor_indicator.armor": "Giáp",
+  "stat.valor_indicator.magic_armor": "Giáp phép",
+  "stat.valor_indicator.crit_rate": "Tỷ lệ chí mạng",
+  "stat.valor_indicator.crit_damage": "Sát thương chí mạng",
+  "stat.valor_indicator.attack_speed": "Tốc đánh",
+  "stat.valor_indicator.health_regen": "Hồi máu / 5s",
+  "stat.valor_indicator.max_mana": "Năng lượng tối đa",
+  "stat.valor_indicator.mana_regen": "Hồi năng lượng / 5s",
+  "stat.valor_indicator.move_speed": "Tốc chạy"
+}
