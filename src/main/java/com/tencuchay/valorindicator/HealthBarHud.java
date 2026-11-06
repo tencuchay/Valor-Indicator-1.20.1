@@ -19,13 +19,17 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodData;
+<<<<<<< HEAD
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
+=======
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 
 /**
+<<<<<<< HEAD
  * Player HUD built from textures/gui/health_bar.png (128x128):
  * <ul>
  *   <li>bottom-left corner: diamond badge with the level and the XP ring, health bar (with tick marks and
@@ -34,6 +38,13 @@ import org.joml.Matrix4f;
  * </ul>
  * All coordinates below are sheet pixels. The player block sits at (0,0) of the sheet and is drawn with
  * its top-left corner as the local origin, so a sheet pixel (x, y) of the block is local (x, y).
+=======
+ * Player HUD in the bottom-left corner, built from textures/gui/health_bar.png (128x128):
+ * diamond badge with the level, health/mana/food bars, oxygen bubbles and an XP ring.
+ *
+ * All coordinates below are sheet pixels; the player block sits at (0,0) of the sheet and is
+ * drawn with its top-left corner as the local origin.
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
  */
 public final class HealthBarHud {
 
@@ -50,7 +61,24 @@ public final class HealthBarHud {
 
     // Health: slot in the frame, and the green fill sprite in the sheet
     private static final int HP_X = 36, HP_Y = 12, HP_W = 90, HP_H = 8;
+<<<<<<< HEAD
     private static final int HP_SPRITE_U = 36, HP_SPRITE_V = 33;
+=======
+    private static final int MANA_X = 36, MANA_Y = 21, MANA_W = 90, MANA_H = 3;
+    private static final int FOOD_X = 36, FOOD_Y = 26, FOOD_W = 90, FOOD_H = 3;
+
+    // Filled bar swatches in health_bar.png. The frames at the top of the sheet stay dark;
+    // the filled portion is copied from these rows so a bar can shrink cleanly from right to left.
+    private static final int HEALTH_FILL_U = 36, HEALTH_FILL_V = 33;
+    private static final int FOOD_FILL_U = 36, FOOD_FILL_V = 90;
+    private static final int SATURATION_FILL_U = 36, SATURATION_FILL_V = 83;
+    private static final int MANA_FILL_U = 36, MANA_FILL_V = 69;
+
+    // Two compact 2x5 bubble grids in the texture: full bubbles at x=6 and empty bubbles at x=21.
+    private static final int BUBBLE_FULL_U = 6, BUBBLE_EMPTY_U = 21, BUBBLE_V = 77;
+    private static final int BUBBLE_W = 5, BUBBLE_H = 4, BUBBLES_PER_COLUMN = 5;
+    private static final int EMPTY_COLOR = 0xFF0A0E12;   // shown where the bar is empty
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
     private static final int TICK_COLOR = 0x99000000;
     private static final int TICK_HEIGHT = 5;
     // Shield (valor_items:shield), #C4C4C4 on average
@@ -81,6 +109,7 @@ public final class HealthBarHud {
     private static final float RING_REACH = 16.5f;        // half size of the area that can be revealed
     private static final float RING_STEP = 0.04f;         // radians per slice of the wipe
 
+<<<<<<< HEAD
     // Level digits in the sheet: 0-9, each 4x10, one every 8 px starting at (40,97)
     private static final int DIGIT_U = 40, DIGIT_V = 97, DIGIT_STEP = 8, DIGIT_W = 4, DIGIT_H = 10, DIGIT_GAP = 1;
 
@@ -93,6 +122,11 @@ public final class HealthBarHud {
     private static final int DARK_OFFSET_X = 15;
     private static final int CLUSTER_X = 6, CLUSTER_Y = 77, CLUSTER_H = 21; // top-left and height of the cluster
     private static final int OXYGEN_GAP = 8; // distance from the right edge of the hotbar
+=======
+    // Level digits in the sheet: 0-9, each 4x10, one every 8 px starting at (40,97).
+    // The redesigned HUD sheet moved this font from row 50 to row 97.
+    private static final int DIGIT_U = 40, DIGIT_V = 97, DIGIT_STEP = 8, DIGIT_W = 4, DIGIT_H = 10, DIGIT_GAP = 1;
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
 
     private HealthBarHud() {}
 
@@ -115,6 +149,11 @@ public final class HealthBarHud {
         double maxMana = attributeValue(player, "max_mana");
         double mana = attributeValue(player, "mana");
         float manaRatio = maxMana > 0.0 ? (float) Mth.clamp(mana / maxMana, 0.0, 1.0) : 0f;
+        FoodData foodData = player.getFoodData();
+        float foodRatio = Mth.clamp(foodData.getFoodLevel() / 20f, 0f, 1f);
+        // The client already knows saturation. Showing it as a thin golden overlay gives the
+        // useful AppleSkin saturation information without requiring AppleSkin as a dependency.
+        float saturationRatio = Mth.clamp(Math.min(foodData.getSaturationLevel(), foodData.getFoodLevel()) / 20f, 0f, 1f);
 
         float scale = ValorConfig.HUD_SCALE.get().floatValue();
 
@@ -132,11 +171,17 @@ public final class HealthBarHud {
         g.blit(TEXTURE, 0, 0, 0f, 0f, BADGE_W, BADGE_H, TEX_SIZE, TEX_SIZE);
         g.blit(TEXTURE, FRAME_X, 0, (float) FRAME_X, 0f, FRAME_W, FRAME_H, TEX_SIZE, TEX_SIZE);
 
+<<<<<<< HEAD
         // Health, then the shields right after it.
         int hpFilled = Math.round(HP_W * health / barMax);
         if (hpFilled > 0) {
             g.blit(TEXTURE, HP_X, HP_Y, (float) HP_SPRITE_U, (float) HP_SPRITE_V, hpFilled, HP_H, TEX_SIZE, TEX_SIZE);
         }
+=======
+        int hpFilled = Math.round(HP_W * health / barMax);
+        drawBarFill(g, HP_X, HP_Y, hpFilled, HP_H, HEALTH_FILL_U, HEALTH_FILL_V);
+        g.fill(HP_X + hpFilled, HP_Y, HP_X + HP_W, HP_Y + HP_H, EMPTY_COLOR);
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
         int shieldWidth = Math.min(HP_W - hpFilled, Math.round(HP_W * shield / barMax));
         if (shieldWidth > 0) {
             g.fillGradient(HP_X + hpFilled, HP_Y, HP_X + hpFilled + shieldWidth, HP_Y + HP_H,
@@ -148,6 +193,28 @@ public final class HealthBarHud {
             g.fillGradient(HP_X + magicStart, HP_Y, HP_X + magicStart + magicWidth, HP_Y + HP_H,
                     MAGIC_SHIELD_TOP, MAGIC_SHIELD_BOTTOM);
         }
+<<<<<<< HEAD
+=======
+        int manaFilled = Math.round(MANA_W * manaRatio);
+        drawBarFill(g, MANA_X, MANA_Y, manaFilled, MANA_H, MANA_FILL_U, MANA_FILL_V);
+        g.fill(MANA_X + manaFilled, MANA_Y, MANA_X + MANA_W, MANA_Y + MANA_H, EMPTY_COLOR);
+
+        int foodFilled = Math.round(FOOD_W * foodRatio);
+        drawBarFill(g, FOOD_X, FOOD_Y, foodFilled, FOOD_H, FOOD_FILL_U, FOOD_FILL_V);
+        g.fill(FOOD_X + foodFilled, FOOD_Y, FOOD_X + FOOD_W, FOOD_Y + FOOD_H, EMPTY_COLOR);
+        // Golden saturation highlight, equivalent to AppleSkin's saturation overlay. It pulses
+        // gently over the red hunger fill so the otherwise hidden saturation level is visible.
+        int saturationFilled = Math.round(FOOD_W * saturationRatio);
+        if (saturationFilled > 0) {
+            float wave = (Mth.sin((player.tickCount + partialTick) * 0.15f) + 1f) * 0.5f;
+            int highlightAlpha = Mth.floor(70f + 45f * wave);
+            g.fill(FOOD_X, FOOD_Y, FOOD_X + saturationFilled, FOOD_Y + FOOD_H,
+                    (highlightAlpha << 24) | 0x00FFD55F);
+            // Fine yellow lower edge keeps the saturation value readable at every HUD scale.
+            drawBarFill(g, FOOD_X, FOOD_Y + FOOD_H - 1, saturationFilled, 1,
+                    SATURATION_FILL_U, SATURATION_FILL_V);
+        }
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
         drawTicks(g, barMax);
 
         // Mana
@@ -167,8 +234,43 @@ public final class HealthBarHud {
         HudIndicatorRenderer.render(g, partialTick, HP_X + HP_W / 2f, 4f);
 
         pose.popPose();
+<<<<<<< HEAD
 
         drawOxygen(g, player, screenWidth, screenHeight, scale);
+=======
+        renderAirBubbles(g, player, screenWidth, screenHeight);
+    }
+
+    private static void drawBarFill(GuiGraphics g, int x, int y, int width, int height, int u, int v) {
+        if (width > 0) {
+            g.blit(TEXTURE, x, y, (float) u, (float) v, width, height, TEX_SIZE, TEX_SIZE);
+        }
+    }
+
+    /**
+     * Replaces Minecraft's air meter with the bubbles from the custom sheet. Like vanilla, it is
+     * only visible after the player has started losing air. Each of the ten bubbles turns empty as
+     * the air supply falls, and the compact grid sits immediately to the right of the hotbar.
+     */
+    private static void renderAirBubbles(GuiGraphics g, Player player, int screenWidth, int screenHeight) {
+        int maxAir = Math.max(1, player.getMaxAirSupply());
+        int air = player.getAirSupply();
+        if (air >= maxAir) return;
+
+        int fullBubbles = Mth.ceil(Mth.clamp(air / (float) maxAir, 0f, 1f) * 10f);
+        int x = screenWidth / 2 + 96;
+        int y = screenHeight - 42;
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        for (int index = 0; index < 10; index++) {
+            int column = index / BUBBLES_PER_COLUMN;
+            int row = index % BUBBLES_PER_COLUMN;
+            int sourceX = (index < fullBubbles ? BUBBLE_FULL_U : BUBBLE_EMPTY_U) + column * BUBBLE_W;
+            g.blit(TEXTURE, x + column * BUBBLE_W, y + row * BUBBLE_H, (float) sourceX,
+                    (float) (BUBBLE_V + row * BUBBLE_H), BUBBLE_W, BUBBLE_H, TEX_SIZE, TEX_SIZE);
+        }
+>>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
     }
 
     /**
