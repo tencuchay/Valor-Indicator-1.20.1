@@ -8,24 +8,32 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.tencuchay.valorindicator.ValorIndicator;
 import com.tencuchay.valorindicator.config.ValorConfig;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodData;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 
 /**
- * Player HUD in the bottom-left corner, built from textures/gui/health_bar.png (128x128):
- * diamond badge with the level, green health bar with tick marks, mana strip, XP ring.
- *
- * All coordinates below are sheet pixels; the player block sits at (0,0) of the sheet and is
- * drawn with its top-left corner as the local origin.
+ * Player HUD built from textures/gui/health_bar.png (128x128):
+ * <ul>
+ *   <li>bottom-left corner: diamond badge with the level and the XP ring, health bar (with tick marks and
+ *       shields), mana strip and the food bar (food + saturation, flashing preview of the food you hold);</li>
+ *   <li>right of the hotbar: oxygen bubbles that turn dark one by one as the air runs out.</li>
+ * </ul>
+ * All coordinates below are sheet pixels. The player block sits at (0,0) of the sheet and is drawn with
+ * its top-left corner as the local origin, so a sheet pixel (x, y) of the block is local (x, y).
  */
 public final class HealthBarHud {
 
@@ -35,15 +43,14 @@ public final class HealthBarHud {
 
     private static final int MARGIN = 6; // distance from the screen edges (before scaling)
 
-    // Player block, cut in two so the ally bar below it is not picked up
+    // Empty frame of the player block, cut in two (badge, then frame with the bar slots)
     private static final int BLOCK_HEIGHT = 36;
-    private static final int BADGE_W = 36, BADGE_H = 36;              // badge + start of the frame
-    private static final int BARS_X = 36, BARS_W = 92, BARS_H = 26;   // frame with the bars
+    private static final int BADGE_W = 36, BADGE_H = 36;
+    private static final int FRAME_X = 36, FRAME_W = 92, FRAME_H = 31;
 
-    // Bars inside the block (full bar as drawn in the sheet)
+    // Health: slot in the frame, and the green fill sprite in the sheet
     private static final int HP_X = 36, HP_Y = 12, HP_W = 90, HP_H = 8;
-    private static final int MANA_X = 36, MANA_Y = 21, MANA_W = 90, MANA_H = 3;
-    private static final int EMPTY_COLOR = 0xFF0A0E12;   // shown where the bar is empty
+    private static final int HP_SPRITE_U = 36, HP_SPRITE_V = 33;
     private static final int TICK_COLOR = 0x99000000;
     private static final int TICK_HEIGHT = 5;
     // Shield (valor_items:shield), #C4C4C4 on average
@@ -52,6 +59,18 @@ public final class HealthBarHud {
     // Magic shield (valor_items:magic_shield), #B77CC2 on average
     private static final int MAGIC_SHIELD_TOP = 0xFFC48ED0;
     private static final int MAGIC_SHIELD_BOTTOM = 0xFFAA6AB4;
+
+    // Mana: slot in the frame, and the strip sprite
+    private static final int MANA_X = 36, MANA_Y = 21, MANA_W = 90, MANA_H = 3;
+    private static final int MANA_SPRITE_U = 36, MANA_SPRITE_V = 69;
+
+    // Food: the slot is a parallelogram under the mana strip. The sprites are the same shape,
+    // 7 px to the right and 50 / 57 rows lower in the sheet.
+    private static final int FOOD_X = 29, FOOD_Y = 26, FOOD_W = 90, FOOD_H = 3;
+    private static final int FOOD_SPRITE_U = 36;
+    private static final int FOOD_BROWN_V = 76;   // food level
+    private static final int FOOD_GOLD_V = 83;    // saturation
+    private static final int MAX_FOOD = 20;
 
     // Badge center (the XP ring is drawn around it)
     private static final float BADGE_CX = 18f, BADGE_CY = 18f;
@@ -62,8 +81,18 @@ public final class HealthBarHud {
     private static final float RING_REACH = 16.5f;        // half size of the area that can be revealed
     private static final float RING_STEP = 0.04f;         // radians per slice of the wipe
 
-    // Level digits in the sheet: 0-9, each 4x10, one every 8 px starting at (40,50)
-    private static final int DIGIT_U = 40, DIGIT_V = 50, DIGIT_STEP = 8, DIGIT_W = 4, DIGIT_H = 10, DIGIT_GAP = 1;
+    // Level digits in the sheet: 0-9, each 4x10, one every 8 px starting at (40,97)
+    private static final int DIGIT_U = 40, DIGIT_V = 97, DIGIT_STEP = 8, DIGIT_W = 4, DIGIT_H = 10, DIGIT_GAP = 1;
+
+    // Oxygen bubbles: {x, y, w, h} of each bright bubble in the sheet, top to bottom. The dark
+    // (empty) version of the same bubble is DARK_OFFSET_X pixels to the right.
+    private static final int[][] BUBBLES = {
+            {7, 77, 3, 3}, {10, 78, 6, 6}, {6, 82, 4, 4}, {12, 85, 4, 4},
+            {6, 87, 6, 6}, {12, 91, 3, 3}, {9, 94, 4, 4}
+    };
+    private static final int DARK_OFFSET_X = 15;
+    private static final int CLUSTER_X = 6, CLUSTER_Y = 77, CLUSTER_H = 21; // top-left and height of the cluster
+    private static final int OXYGEN_GAP = 8; // distance from the right edge of the hotbar
 
     private HealthBarHud() {}
 
@@ -99,12 +128,15 @@ public final class HealthBarHud {
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
+        // Empty frame: badge, and the frame with the health / mana / food slots.
         g.blit(TEXTURE, 0, 0, 0f, 0f, BADGE_W, BADGE_H, TEX_SIZE, TEX_SIZE);
-        g.blit(TEXTURE, BARS_X, 0, (float) BARS_X, 0f, BARS_W, BARS_H, TEX_SIZE, TEX_SIZE);
+        g.blit(TEXTURE, FRAME_X, 0, (float) FRAME_X, 0f, FRAME_W, FRAME_H, TEX_SIZE, TEX_SIZE);
 
-        // The sheet shows both bars full; cover the part that is missing.
+        // Health, then the shields right after it.
         int hpFilled = Math.round(HP_W * health / barMax);
-        g.fill(HP_X + hpFilled, HP_Y, HP_X + HP_W, HP_Y + HP_H, EMPTY_COLOR);
+        if (hpFilled > 0) {
+            g.blit(TEXTURE, HP_X, HP_Y, (float) HP_SPRITE_U, (float) HP_SPRITE_V, hpFilled, HP_H, TEX_SIZE, TEX_SIZE);
+        }
         int shieldWidth = Math.min(HP_W - hpFilled, Math.round(HP_W * shield / barMax));
         if (shieldWidth > 0) {
             g.fillGradient(HP_X + hpFilled, HP_Y, HP_X + hpFilled + shieldWidth, HP_Y + HP_H,
@@ -116,9 +148,16 @@ public final class HealthBarHud {
             g.fillGradient(HP_X + magicStart, HP_Y, HP_X + magicStart + magicWidth, HP_Y + HP_H,
                     MAGIC_SHIELD_TOP, MAGIC_SHIELD_BOTTOM);
         }
-        int manaFilled = Math.round(MANA_W * manaRatio);
-        g.fill(MANA_X + manaFilled, MANA_Y, MANA_X + MANA_W, MANA_Y + MANA_H, EMPTY_COLOR);
         drawTicks(g, barMax);
+
+        // Mana
+        int manaFilled = Math.round(MANA_W * manaRatio);
+        if (manaFilled > 0) {
+            g.blit(TEXTURE, MANA_X, MANA_Y, (float) MANA_SPRITE_U, (float) MANA_SPRITE_V, manaFilled, MANA_H,
+                    TEX_SIZE, TEX_SIZE);
+        }
+
+        drawFood(g, player);
         g.flush();
 
         drawXpRing(g, player.experienceProgress);
@@ -128,6 +167,8 @@ public final class HealthBarHud {
         HudIndicatorRenderer.render(g, partialTick, HP_X + HP_W / 2f, 4f);
 
         pose.popPose();
+
+        drawOxygen(g, player, screenWidth, screenHeight, scale);
     }
 
     /**
@@ -144,6 +185,92 @@ public final class HealthBarHud {
             g.fill(x, HP_Y, x + 1, HP_Y + TICK_HEIGHT, TICK_COLOR);
         }
     }
+
+    // ---------------------------------------------------------------- food
+
+    private static void drawFood(GuiGraphics g, Player player) {
+        FoodData data = player.getFoodData();
+        int food = Mth.clamp(data.getFoodLevel(), 0, MAX_FOOD);
+        float saturation = Mth.clamp(data.getSaturationLevel(), 0f, (float) food);
+
+        int foodPx = Math.round(FOOD_W * food / (float) MAX_FOOD);
+        int satPx = Math.round(FOOD_W * saturation / MAX_FOOD);
+        foodStrip(g, FOOD_BROWN_V, 0, foodPx);
+        foodStrip(g, FOOD_GOLD_V, 0, satPx);
+
+        // Holding food: the food and saturation eating it would add flash on the bar (same rules as vanilla).
+        FoodProperties held = heldFood(player);
+        if (held != null) {
+            int foodAfter = Math.min(MAX_FOOD, food + held.getNutrition());
+            float satAfter = Math.min(saturation + held.getNutrition() * held.getSaturationModifier() * 2f,
+                    (float) foodAfter);
+            int foodAfterPx = Math.round(FOOD_W * foodAfter / (float) MAX_FOOD);
+            int satAfterPx = Math.round(FOOD_W * satAfter / MAX_FOOD);
+
+            float alpha = 0.35f + 0.4f * (0.5f + 0.5f * Mth.sin((Util.getMillis() % 100000L) / 160f));
+            RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
+            foodStrip(g, FOOD_BROWN_V, foodPx, foodAfterPx);
+            foodStrip(g, FOOD_GOLD_V, satPx, satAfterPx);
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        }
+    }
+
+    /** Draws the part of a food sprite between fromPx and toPx (pixels from the left end of the bar). */
+    private static void foodStrip(GuiGraphics g, int spriteV, int fromPx, int toPx) {
+        if (toPx <= fromPx) return;
+        g.blit(TEXTURE, FOOD_X + fromPx, FOOD_Y, (float) (FOOD_SPRITE_U + fromPx), (float) spriteV,
+                toPx - fromPx, FOOD_H, TEX_SIZE, TEX_SIZE);
+    }
+
+    /** Food in the main hand or offhand that can be eaten right now, or null. */
+    private static FoodProperties heldFood(Player player) {
+        FoodProperties main = eatable(player, player.getMainHandItem());
+        return main != null ? main : eatable(player, player.getOffhandItem());
+    }
+
+    private static FoodProperties eatable(Player player, ItemStack stack) {
+        if (stack.isEmpty()) return null;
+        FoodProperties props = stack.getFoodProperties(player);
+        return (props != null && player.canEat(props.canAlwaysEat())) ? props : null;
+    }
+
+    // ---------------------------------------------------------------- oxygen
+
+    /**
+     * Bubbles right of the hotbar. Shown under water or while the air is not full, like vanilla.
+     * Bubbles turn dark from the top one down as the air runs out.
+     */
+    private static void drawOxygen(GuiGraphics g, Player player, int screenWidth, int screenHeight, float scale) {
+        int maxAir = Math.max(1, player.getMaxAirSupply());
+        int air = Mth.clamp(player.getAirSupply(), 0, maxAir);
+        if (!player.isEyeInFluid(FluidTags.WATER) && air >= maxAir) return;
+
+        int total = BUBBLES.length;
+        int present = Mth.clamp(Mth.ceil(air * (float) total / maxAir), 0, total);
+
+        g.flush();
+        PoseStack pose = g.pose();
+        pose.pushPose();
+        // Vertically centered on the hotbar (22 px tall, at the bottom of the screen).
+        pose.translate(screenWidth / 2f + 91f + OXYGEN_GAP, screenHeight - 11f - CLUSTER_H * scale / 2f, 0f);
+        pose.scale(scale, scale, 1f);
+
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+
+        for (int i = 0; i < total; i++) {
+            int[] b = BUBBLES[i];
+            boolean full = i >= total - present;
+            int u = full ? b[0] : b[0] + DARK_OFFSET_X;
+            g.blit(TEXTURE, b[0] - CLUSTER_X, b[1] - CLUSTER_Y, (float) u, (float) b[1], b[2], b[3],
+                    TEX_SIZE, TEX_SIZE);
+        }
+
+        pose.popPose();
+    }
+
+    // ---------------------------------------------------------------- badge
 
     /** Reveals the yellow ring clockwise, starting at the left corner, like a clock wipe. */
     private static void drawXpRing(GuiGraphics g, float progress) {
