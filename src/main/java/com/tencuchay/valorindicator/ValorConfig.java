@@ -188,7 +188,7 @@ public final class ValorConfig {
         b.pop();
 
         b.comment("Health bar HUD (bottom-left corner)").push("hud");
-        HUD_ENABLED = b.comment("Replace the vanilla hearts and experience bar with the Valor health bar.")
+        HUD_ENABLED = b.comment("Replace vanilla health, armor, food, air and experience HUD elements with the Valor HUD.")
                 .define("healthBarEnabled", true);
         HUD_SCALE = b.comment("Size of the health bar.")
                 .defineInRange("healthBarScale", 1.0D, 0.5D, 4.0D);
