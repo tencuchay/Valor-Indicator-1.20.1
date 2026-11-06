@@ -9,6 +9,7 @@ import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -37,12 +38,21 @@ public final class ClientEvents {
         IndicatorManager.tick();
     }
 
-    @SubscribeEvent
+    /*
+     * AppleSkin renders its saturation/exhaustion layers from the FOOD overlay event.  Cancelling
+     * that event before AppleSkin handles it also suppresses those vanilla-positioned layers, so
+     * they cannot be left floating over Valor's replacement food bar.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onOverlayPre(RenderGuiOverlayEvent.Pre event) {
         if (!ValorConfig.HUD_ENABLED.get()) return;
 
         ResourceLocation id = event.getOverlay().id();
-        if (id.equals(VanillaGuiOverlay.PLAYER_HEALTH.id()) || id.equals(VanillaGuiOverlay.EXPERIENCE_BAR.id())) {
+        if (id.equals(VanillaGuiOverlay.PLAYER_HEALTH.id())
+                || id.equals(VanillaGuiOverlay.ARMOR_LEVEL.id())
+                || id.equals(VanillaGuiOverlay.FOOD_LEVEL.id())
+                || id.equals(VanillaGuiOverlay.AIR_LEVEL.id())
+                || id.equals(VanillaGuiOverlay.EXPERIENCE_BAR.id())) {
             event.setCanceled(true);
         }
     }
