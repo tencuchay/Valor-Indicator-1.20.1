@@ -48,20 +48,12 @@ public final class ClientEvents {
         if (!ValorConfig.HUD_ENABLED.get()) return;
 
         ResourceLocation id = event.getOverlay().id();
-<<<<<<< HEAD
         // Hearts, experience bar, armor, food and air are replaced by the Valor HUD.
         if (id.equals(VanillaGuiOverlay.PLAYER_HEALTH.id())
                 || id.equals(VanillaGuiOverlay.EXPERIENCE_BAR.id())
                 || id.equals(VanillaGuiOverlay.ARMOR_LEVEL.id())
                 || id.equals(VanillaGuiOverlay.FOOD_LEVEL.id())
                 || id.equals(VanillaGuiOverlay.AIR_LEVEL.id())) {
-=======
-        if (id.equals(VanillaGuiOverlay.PLAYER_HEALTH.id())
-                || id.equals(VanillaGuiOverlay.ARMOR_LEVEL.id())
-                || id.equals(VanillaGuiOverlay.FOOD_LEVEL.id())
-                || id.equals(VanillaGuiOverlay.AIR_LEVEL.id())
-                || id.equals(VanillaGuiOverlay.EXPERIENCE_BAR.id())) {
->>>>>>> 394d3d9e5841c267b588d3a3c5ce99f6da67a739
             event.setCanceled(true);
         }
     }
