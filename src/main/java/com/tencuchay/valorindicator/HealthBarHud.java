@@ -65,8 +65,8 @@ public final class HealthBarHud {
     private static final int MANA_SPRITE_U = 36, MANA_SPRITE_V = 69;
 
     // Food: the slot is a parallelogram under the mana strip. The sprites are the same shape,
-    // 7 px to the right and 50 / 57 rows lower in the sheet.
-    private static final int FOOD_X = 29, FOOD_Y = 26, FOOD_W = 90, FOOD_H = 3;
+    // 6 px to the right and 51 / 58 rows lower in the sheet.
+    private static final int FOOD_X = 30, FOOD_Y = 25, FOOD_W = 90, FOOD_H = 3;
     private static final int FOOD_SPRITE_U = 36;
     private static final int FOOD_BROWN_V = 76;   // food level
     private static final int FOOD_GOLD_V = 83;    // saturation
@@ -92,7 +92,8 @@ public final class HealthBarHud {
     };
     private static final int DARK_OFFSET_X = 15;
     private static final int CLUSTER_X = 6, CLUSTER_Y = 77, CLUSTER_H = 21; // top-left and height of the cluster
-    private static final int OXYGEN_GAP = 8; // distance from the right edge of the hotbar
+    private static final int OXYGEN_GAP = 4;  // distance from the right edge of the hotbar
+    private static final float OXYGEN_LIFT = 2f; // raised so the bubbles do not touch the bottom of the screen
 
     private HealthBarHud() {}
 
@@ -280,8 +281,9 @@ public final class HealthBarHud {
         g.flush();
         PoseStack pose = g.pose();
         pose.pushPose();
-        // Vertically centered on the hotbar (22 px tall, at the bottom of the screen).
-        pose.translate(screenWidth / 2f + 91f + OXYGEN_GAP, screenHeight - 11f - CLUSTER_H * scale / 2f, 0f);
+        // Vertically centered on the hotbar (22 px tall, at the bottom of the screen), then raised a little.
+        pose.translate(screenWidth / 2f + 91f + OXYGEN_GAP,
+                screenHeight - 11f - OXYGEN_LIFT - CLUSTER_H * scale / 2f, 0f);
         pose.scale(scale, scale, 1f);
 
         RenderSystem.enableBlend();
