@@ -40,6 +40,8 @@ public final class HealthBarHud {
     private static final ResourceLocation TEXTURE =
             new ResourceLocation(ValorIndicator.MOD_ID, "textures/gui/health_bar.png");
     private static final int TEX_SIZE = 128;
+    private static final ResourceLocation STACK_TEXTURE =
+            new ResourceLocation(ValorIndicator.MOD_ID, "textures/gui/weapons_stack_hud.png");
 
     private static final int MARGIN = 6; // distance from the screen edges (before scaling)
 
@@ -63,6 +65,16 @@ public final class HealthBarHud {
     // Mana: slot in the frame, and the strip sprite
     private static final int MANA_X = 36, MANA_Y = 21, MANA_W = 90, MANA_H = 3;
     private static final int MANA_SPRITE_U = 36, MANA_SPRITE_V = 69;
+
+    // Weapon stacks (weapons_stack_hud.png, 128x128): while holding the weapon, the bar takes the place of the
+    // mana strip. All three sprites are 90x3 and already have the 2 dividers drawn in (every 2 stacks).
+    private static final ResourceLocation STACK_WEAPON = new ResourceLocation("valor_weapons", "thunder_lord_fist");
+    private static final int MAX_STACKS = 6;
+    private static final int STACK_U = 20;
+    private static final int STACK_EMPTY_V = 5;     // dark empty bar
+    private static final int STACK_PARTIAL_V = 13;  // grey bar, used below the maximum
+    private static final int STACK_FULL_V = 20;     // bright cyan bar, used at the maximum
+    private static final int STACK_PX = MANA_W / MAX_STACKS; // 15 px per stack
 
     // Food: the slot is a parallelogram under the mana strip. The sprites are the same shape,
     // 6 px to the right and 51 / 58 rows lower in the sheet.
@@ -151,11 +163,17 @@ public final class HealthBarHud {
         }
         drawTicks(g, barMax);
 
-        // Mana
-        int manaFilled = Math.round(MANA_W * manaRatio);
-        if (manaFilled > 0) {
-            g.blit(TEXTURE, MANA_X, MANA_Y, (float) MANA_SPRITE_U, (float) MANA_SPRITE_V, manaFilled, MANA_H,
-                    TEX_SIZE, TEX_SIZE);
+        // Mana strip, or the weapon stack bar in its place while the weapon is held.
+        if (holdsStackWeapon(player)) {
+            int stacks = Mth.clamp(Math.round((float) attributeValue(player, "valor_weapons", "thunder_stacks")),
+                    0, MAX_STACKS);
+            drawStackBar(g, stacks);
+        } else {
+            int manaFilled = Math.round(MANA_W * manaRatio);
+            if (manaFilled > 0) {
+                g.blit(TEXTURE, MANA_X, MANA_Y, (float) MANA_SPRITE_U, (float) MANA_SPRITE_V, manaFilled, MANA_H,
+                        TEX_SIZE, TEX_SIZE);
+            }
         }
 
         drawFood(g, player);
@@ -185,6 +203,35 @@ public final class HealthBarHud {
             int x = HP_X + Math.round(HP_W * (k * unit / maxHealth));
             g.fill(x, HP_Y, x + 1, HP_Y + TICK_HEIGHT, TICK_COLOR);
         }
+    }
+
+    // ---------------------------------------------------------------- weapon stacks
+
+    /** Below the maximum: the grey bar, 15 px per stack. At the maximum: the whole bright bar. */
+    private static void drawStackBar(GuiGraphics g, int stacks) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+
+        // The dark bar with the dividers also covers the empty mana strip underneath.
+        g.blit(STACK_TEXTURE, MANA_X, MANA_Y, (float) STACK_U, (float) STACK_EMPTY_V, MANA_W, MANA_H,
+                TEX_SIZE, TEX_SIZE);
+        if (stacks >= MAX_STACKS) {
+            g.blit(STACK_TEXTURE, MANA_X, MANA_Y, (float) STACK_U, (float) STACK_FULL_V, MANA_W, MANA_H,
+                    TEX_SIZE, TEX_SIZE);
+        } else if (stacks > 0) {
+            g.blit(STACK_TEXTURE, MANA_X, MANA_Y, (float) STACK_U, (float) STACK_PARTIAL_V, stacks * STACK_PX, MANA_H,
+                    TEX_SIZE, TEX_SIZE);
+        }
+    }
+
+    /** True while the weapon is in the main hand or the offhand. */
+    private static boolean holdsStackWeapon(Player player) {
+        return isStackWeapon(player.getMainHandItem()) || isStackWeapon(player.getOffhandItem());
+    }
+
+    private static boolean isStackWeapon(ItemStack stack) {
+        return !stack.isEmpty() && STACK_WEAPON.equals(ForgeRegistries.ITEMS.getKey(stack.getItem()));
     }
 
     // ---------------------------------------------------------------- food
@@ -357,7 +404,12 @@ public final class HealthBarHud {
 
     /** Value of a valor_items attribute, or 0 when the attribute (or the mod) is not there. */
     private static double attributeValue(Player player, String path) {
-        ResourceLocation id = new ResourceLocation("valor_items", path);
+        return attributeValue(player, "valor_items", path);
+    }
+
+    /** Value of an attribute from any mod, or 0 when the attribute (or the mod) is not there. */
+    private static double attributeValue(Player player, String namespace, String path) {
+        ResourceLocation id = new ResourceLocation(namespace, path);
         if (!ForgeRegistries.ATTRIBUTES.containsKey(id)) return 0.0;
         Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(id);
         AttributeInstance instance = attribute != null ? player.getAttribute(attribute) : null;
