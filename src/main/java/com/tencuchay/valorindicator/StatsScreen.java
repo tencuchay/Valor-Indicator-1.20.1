@@ -49,7 +49,8 @@ public final class StatsScreen extends Screen {
     private static final Stat ATTACK_SPEED = new Stat("attack_speed", () -> Attributes.ATTACK_SPEED, 10, true, false); // 4.0 -> 40%
     private static final Stat CRIT_RATE = new Stat("crit_rate", () -> modded("valor_items", "crit_rate"), 100, true, false);
     private static final Stat HEALTH_REGEN = new Stat("health_regen", () -> modded("valor_items", "health_regen"), 1, false, false);
-    private static final Stat LETHALITY = new Stat("lethality", () -> modded("valor_items", "lethality"), 1, false, false);
+    private static final Stat ARMOR_PENETRATION_LETHALITY = new Stat("armor_penetration_lethality", () -> modded("valor_items", "armor_penetration_percent"), 100, true, false);
+    private static final Stat LIFESTEAL = new Stat("lifesteal", () -> modded("valor_items", "lifesteal"), 100, true, false);
 
     private static final Stat MAGIC_POWER = new Stat("magic_power", () -> modded("valor_items", "magic_damage"), 1, false, true);
     private static final Stat MAX_MANA = new Stat("max_mana", () -> modded("valor_items", "max_mana"), 1, false, true);
@@ -57,10 +58,13 @@ public final class StatsScreen extends Screen {
     private static final Stat MOVE_SPEED = new Stat("move_speed", () -> Attributes.MOVEMENT_SPEED, 1000, false, true); // 0.1 -> 100
     private static final Stat CRIT_DAMAGE = new Stat("crit_damage", () -> modded("valor_items", "crit_damage"), 100, true, false);
     private static final Stat MANA_REGEN = new Stat("mana_regen", () -> modded("valor_items", "mana_regen"), 1, false, false);
-    private static final Stat ARMOR_PENETRATION_PERCENT = new Stat("armor_penetration_percent", () -> modded("valor_items", "armor_penetration_percent"), 100, true, false);
+    private static final Stat MAGIC_PENETRATION = new Stat("magic_penetration", () -> modded("valor_items", "magic_penetration"), 1, false, false);
+    private static final Stat MAGIC_LIFESTEAL = new Stat("magic_lifesteal", () -> modded("valor_items", "magic_lifesteal"), 100, true, false);
 
-    private static final List<Stat> COLUMN_1 = List.of(ATTACK, MAX_HEALTH, ARMOR, ATTACK_SPEED, CRIT_RATE, HEALTH_REGEN, LETHALITY);
-    private static final List<Stat> COLUMN_2 = List.of(MAGIC_POWER, MAX_MANA, MAGIC_ARMOR, MOVE_SPEED, CRIT_DAMAGE, MANA_REGEN, ARMOR_PENETRATION_PERCENT);
+    private static final List<Stat> COLUMN_1 = List.of(ATTACK, MAX_HEALTH, ARMOR, ATTACK_SPEED, CRIT_RATE, HEALTH_REGEN,
+            ARMOR_PENETRATION_LETHALITY, LIFESTEAL);
+    private static final List<Stat> COLUMN_2 = List.of(MAGIC_POWER, MAX_MANA, MAGIC_ARMOR, MOVE_SPEED, CRIT_DAMAGE, MANA_REGEN,
+            MAGIC_PENETRATION, MAGIC_LIFESTEAL);
 
     private static final int PANEL_WIDTH = 480;
     private static final int SIDE_WIDTH = 240;
@@ -137,17 +141,14 @@ public final class StatsScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (this.selectedStat != null) {
-            int w = Math.min(PANEL_WIDTH, this.width - 16);
+            int w = mainPanelWidth();
             int rows = Math.max(COLUMN_1.size(), COLUMN_2.size());
             int h = HEADER + rows * ROW_HEIGHT + PADDING;
             int sideW = SIDE_WIDTH;
-            int totalW = Math.min(this.width - 16, w + 8 + sideW);
-            int left = Math.max(8, (this.width - totalW) / 2);
+            int totalW = w + 8 + sideW;
+            int left = (this.width - totalW) / 2;
             int top = Math.max(8, (this.height - h) / 2);
             int sideLeft = left + w + 8;
-            if (sideLeft + sideW > this.width - 4) {
-                sideLeft = this.width - sideW - 4;
-            }
 
             if (mouseX >= sideLeft && mouseX <= sideLeft + sideW && mouseY >= top && mouseY <= top + h) {
                 int scrollStep = (int) (delta * MOD_ROW_HEIGHT);
@@ -162,22 +163,19 @@ public final class StatsScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(g);
 
-        int w = Math.min(PANEL_WIDTH, this.width - 16);
+        int w = mainPanelWidth();
         int columnWidth = (w - 2 * PADDING - COLUMN_GAP) / 2;
         int rows = Math.max(COLUMN_1.size(), COLUMN_2.size());
         int h = HEADER + rows * ROW_HEIGHT + PADDING;
 
         boolean showSide = (this.selectedStat != null);
         int sideW = SIDE_WIDTH;
-        int totalW = showSide ? Math.min(this.width - 16, w + 8 + sideW) : w;
+        int totalW = showSide ? w + 8 + sideW : w;
 
-        int left = Math.max(8, (this.width - totalW) / 2);
+        int left = showSide ? (this.width - totalW) / 2 : Math.max(8, (this.width - totalW) / 2);
         int top = Math.max(8, (this.height - h) / 2);
 
         int sideLeft = left + w + 8;
-        if (sideLeft + sideW > this.width - 4) {
-            sideLeft = this.width - sideW - 4;
-        }
 
         // Main panel background + border
         g.fill(left, top, left + w, top + h, PANEL_COLOR);
@@ -229,10 +227,20 @@ public final class StatsScreen extends Screen {
                 g.fill(x - 4, y - 3, x + width + 4, y + ROW_HEIGHT - 3, ROW_STRIPE);
             }
 
+            List<Segment> values = valueSegments(stat, player);
+            int valuesWidth = segmentsWidth(values);
+            String label = Component.translatable("stat.valor_indicator." + stat.langKey()).getString();
+            int labelWidth = Math.max(0, width - valuesWidth - 8);
+            if (this.font.width(label) > labelWidth) {
+                String ellipsis = "...";
+                label = labelWidth >= this.font.width(ellipsis)
+                        ? this.font.plainSubstrByWidth(label, labelWidth - this.font.width(ellipsis)) + ellipsis
+                        : "";
+            }
+
             int labelColor = isSelected ? 0xFFFFF0A0 : (isHovered ? WHITE : LABEL_COLOR);
-            g.drawString(this.font, Component.translatable("stat.valor_indicator." + stat.langKey()),
-                    x, y + 1, labelColor, false);
-            drawValue(g, valueSegments(stat, player), x + width, y + 1);
+            g.drawString(this.font, label, x, y + 1, labelColor, false);
+            drawValue(g, values, x + width, y + 1);
             y += ROW_HEIGHT;
         }
         return hovered;
@@ -429,7 +437,8 @@ public final class StatsScreen extends Screen {
                 "amulet_of_longevity", "blitz_blade", "death_sickle",
                 "devils_handshake", "fafnirs_talon", "fenrirs_fang", "gaias_standard",
                 "hercules_madness", "mail_of_pain", "mantle_of_ra", "odins_will",
-                "rankbreaker", "stikks_sting", "uriels_brand"
+                "rankbreaker", "stikks_sting", "uriels_brand", "arctic_orb", "soaring_aura",
+                "beriths_agony", "zweihander"
         };
         for (String relicId : relics) {
             if (lower.contains(relicId)) {
@@ -518,15 +527,15 @@ public final class StatsScreen extends Screen {
     }
 
     private Stat getStatAt(double mouseX, double mouseY) {
-        int w = Math.min(PANEL_WIDTH, this.width - 16);
+        int w = mainPanelWidth();
         int columnWidth = (w - 2 * PADDING - COLUMN_GAP) / 2;
         int rows = Math.max(COLUMN_1.size(), COLUMN_2.size());
         int h = HEADER + rows * ROW_HEIGHT + PADDING;
 
         int sideW = SIDE_WIDTH;
         boolean showSide = (this.selectedStat != null);
-        int totalW = showSide ? Math.min(this.width - 16, w + 8 + sideW) : w;
-        int left = Math.max(8, (this.width - totalW) / 2);
+        int totalW = showSide ? w + 8 + sideW : w;
+        int left = showSide ? (this.width - totalW) / 2 : Math.max(8, (this.width - totalW) / 2);
         int top = Math.max(8, (this.height - h) / 2);
 
         int col1X = left + PADDING;
@@ -550,20 +559,25 @@ public final class StatsScreen extends Screen {
 
     private boolean isOverCloseButton(double mouseX, double mouseY) {
         if (this.selectedStat == null) return false;
-        int w = Math.min(PANEL_WIDTH, this.width - 16);
+        int w = mainPanelWidth();
         int rows = Math.max(COLUMN_1.size(), COLUMN_2.size());
         int h = HEADER + rows * ROW_HEIGHT + PADDING;
         int sideW = SIDE_WIDTH;
-        int totalW = Math.min(this.width - 16, w + 8 + sideW);
-        int left = Math.max(8, (this.width - totalW) / 2);
+        int totalW = w + 8 + sideW;
+        int left = (this.width - totalW) / 2;
         int top = Math.max(8, (this.height - h) / 2);
         int sideLeft = left + w + 8;
-        if (sideLeft + sideW > this.width - 4) {
-            sideLeft = this.width - sideW - 4;
-        }
         int closeX = sideLeft + sideW - PADDING - 8;
         int closeY = top + 10;
         return mouseX >= closeX - 4 && mouseX <= closeX + 12 && mouseY >= closeY - 4 && mouseY <= closeY + 12;
+    }
+
+    /** Keeps both panels side by side by shrinking the main panel only while details are open. */
+    private int mainPanelWidth() {
+        if (this.selectedStat == null) {
+            return Math.min(PANEL_WIDTH, this.width - 16);
+        }
+        return Math.min(PANEL_WIDTH, this.width - SIDE_WIDTH - 24);
     }
 
     private static void drawOutline(GuiGraphics g, int x, int y, int width, int height, int color) {
@@ -575,20 +589,37 @@ public final class StatsScreen extends Screen {
 
     /** Draws the segments right-aligned so that their end is at rightX. */
     private void drawValue(GuiGraphics g, List<Segment> segments, int rightX, int y) {
-        int total = 0;
-        for (Segment s : segments) total += this.font.width(s.text());
-        int x = rightX - total;
+        int x = rightX - segmentsWidth(segments);
         for (Segment s : segments) {
             g.drawString(this.font, s.text(), x, y, s.color(), false);
             x += this.font.width(s.text());
         }
     }
 
+    private int segmentsWidth(List<Segment> segments) {
+        int width = 0;
+        for (Segment s : segments) width += this.font.width(s.text());
+        return width;
+    }
+
     private static List<Segment> valueSegments(Stat stat, Player player) {
         List<Segment> out = new ArrayList<>();
 
+        if (stat == ARMOR_PENETRATION_LETHALITY) {
+            AttributeInstance penetration = attributeInstance(player, stat.attribute().get());
+            AttributeInstance lethality = attributeInstance(player, modded("valor_items", "lethality"));
+            double penetrationTotal = penetration != null ? penetration.getValue() : 0.0;
+            double lethalityTotal = lethality != null ? lethality.getValue() : 0.0;
+            boolean penetrationChanged = penetration != null && Math.abs(penetrationTotal - penetration.getBaseValue()) >= EPSILON;
+            boolean lethalityChanged = lethality != null && Math.abs(lethalityTotal - lethality.getBaseValue()) >= EPSILON;
+            out.add(new Segment(format(penetrationTotal, stat), penetrationChanged ? GREEN : WHITE));
+            out.add(new Segment(" | ", WHITE));
+            out.add(new Segment(NUMBER.format(lethalityTotal), lethalityChanged ? GREEN : WHITE));
+            return out;
+        }
+
         Attribute attribute = stat.attribute().get();
-        AttributeInstance instance = (player != null && attribute != null) ? player.getAttribute(attribute) : null;
+        AttributeInstance instance = attributeInstance(player, attribute);
         double total = instance != null ? instance.getValue() : 0.0;
         double base = instance != null ? instance.getBaseValue() : 0.0;
 
@@ -611,6 +642,10 @@ public final class StatsScreen extends Screen {
         out.add(new Segment((bonus > 0 ? "+" : "-") + format(Math.abs(bonus), stat), color));
         out.add(new Segment(")", WHITE));
         return out;
+    }
+
+    private static AttributeInstance attributeInstance(Player player, Attribute attribute) {
+        return player != null && attribute != null ? player.getAttribute(attribute) : null;
     }
 
     private static String format(double value, Stat stat) {
